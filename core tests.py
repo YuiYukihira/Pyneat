@@ -1,7 +1,9 @@
-import core
 import logging
 
+import core
+
 logging.basicConfig(filename='CoreTests.log', level=logging.INFO)
+
 
 def test1():
     graph = core.Graph({
@@ -16,6 +18,7 @@ def test1():
         logging.info('Test 1: Passed.')
     else:
         logging.info('Test 1: Failed!')
+
 
 def test2():
     graph = core.NeatGraph({
@@ -39,6 +42,17 @@ def test2():
         logging.info('Test 2: Failed!')
 
 
+def test3():
+    graph = core.Graph({})
+    logging.debug(graph.run({}))
+    logging.debug(graph.run({'a': 1}))
+    if graph.run({}) is None and graph.run({'a': 1}) is None:
+        logging.info('Test 3: Passed.')
+    else:
+        logging.info('Test 3: Failed!')
+
+
 if __name__ == '__main__':
     test1()
     test2()
+    test3()
