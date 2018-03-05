@@ -1,0 +1,127 @@
+import pytest
+import core
+import random
+
+def test_graph():
+    graph = core.Graph({
+        'e': {'nodes': [('d', 1, 0)], 'type': 'exit'},
+        'd': {'nodes': [], 'type': 'enter'},
+        'c': {'nodes': [('a', 1, 0), ('b', 1, 0)], 'type': 'exit'},
+        'b': {'nodes': [], 'type': 'enter'},
+        'a': {'nodes': [], 'type': 'enter'}
+    })
+    assert graph.run({'a': 1, 'b': 1, 'd': 1}) == ([1.0, 2.0], ['e', 'c'])
+
+def test_graph_disconnected():
+    graph = core.Graph({
+        'd': {'nodes': [], 'type': 'exit'},
+        'c': {'nodes': [('b', 1, 0), ('a', 1, 0)], 'type': 'hidden'},
+        'b': {'nodes': [], 'type': 'enter'},
+        'a': {'nodes': [], 'type': 'enter'}
+    })
+    assert graph.run({'a': 1, 'b': 1}) == ([0.0], ['d'])
+
+def test_neat_graph_convert():
+    graph = core.Graph({
+        'e': {'nodes': [('d', 1, 0)], 'type': 'exit'},
+        'd': {'nodes': [], 'type': 'enter'},
+        'c': {'nodes': [('a', 1, 0), ('b', 1, 0)], 'type': 'exit'},
+        'b': {'nodes': [], 'type': 'enter'},
+        'a': {'nodes': [], 'type': 'enter'}
+    })
+    ngraph = core.NeatGraph(core.Genotype(
+        nodes=[
+            core.NodeGene('e', 'exit'),
+            core.NodeGene('d', 'enter'),
+            core.NodeGene('c', 'exit'),
+            core.NodeGene('b', 'enter'),
+            core.NodeGene('a', 'enter')
+        ],
+        conns={
+            1: core.ConnGene('a', 'c', 1.0, True),
+            2: core.ConnGene('b', 'c', 1.0, True),
+            3: core.ConnGene('d', 'e', 1.0, True)
+        }, mutation_rate=100))
+    assert ngraph.phenotype.shape == graph.shape
+
+def test_neat_graph_run():
+    ngraph = core.NeatGraph(core.Genotype(
+        nodes=[
+            core.NodeGene('e', 'exit'),
+            core.NodeGene('d', 'enter'),
+            core.NodeGene('c', 'exit'),
+            core.NodeGene('b', 'enter'),
+            core.NodeGene('a', 'enter')
+        ],
+        conns={
+            1: core.ConnGene('a', 'c', 1.0, True),
+            2: core.ConnGene('b', 'c', 1.0, True),
+            3: core.ConnGene('d', 'e', 1.0, True)
+        }, mutation_rate=100))
+    assert ngraph.run({'a': 1, 'b': 1, 'd': 1}) == ([1.0, 2.0], ['e', 'c'])
+
+def test_graph_empty():
+    graph = core.Graph({})
+    assert graph.run({}) is None
+    assert graph.run({'a': 1}) is None
+
+def test_neat_graph_empty():
+    graph = core.NeatGraph(core.Genotype([], {}, 100))
+    assert graph.genotype.nodes == []
+    assert graph.genotype.conns == {}
+    assert graph.phenotype.shape == {}
+
+def test_neat_controller_init():
+    controller = core.NeatController(10, 10, {'a': 'enter', 'b': 'enter', 'c': 'exit'})
+    for i in range(0, 10):
+        for j in range(0, 10):
+            assert isinstance(controller.graphs[i][j], core.NeatGraph)
+            nodes = [node.id for node in controller.graphs[i][j].genotype.nodes]
+            assert nodes == ['a', 'b', 'c']
+            assert controller.graphs[i][j].genotype.conns == {}
+            assert controller.scores[i][j] == 0
+
+def test_neat_controller_scoring():
+    controller = core.NeatController(2,2, {'a': 'enter', 'b': 'enter', 'c': 'exit'})
+    assert controller.scores == {0: {0: 0, 1: 0}, 1: {0: 0, 1: 0}}
+    controller.game_over(10)
+    assert controller.scores == {0: {0: 10, 1: 0}, 1: {0: 0, 1: 0}}
+    controller.game_over(555)
+    assert controller.scores == {0: {0: 10, 1: 555}, 1: {0: 0, 1: 0}}
+    controller.game_over(1)
+    assert controller.scores == {0: {0: 10, 1: 555}, 1: {0: 1, 1: 0}}
+
+def test_neat_controller_breeding():
+    random.seed(1)
+    controller = core.NeatController(1,5,{'a': 'enter', 'b': 'enter', 'c': 'exit'})
+    controller.game_over(1)
+    controller.game_over(2)
+    controller.game_over(3)
+    controller.game_over(4)
+    controller.game_over(5)
+    assert len(controller.graphs[0]) == 5
+    assert controller.graphs[0] != {}
+    print(f'graphs: {controller.graphs[0]}')
+    for graph_g in controller.graphs[0].values():
+        node_ids = {i.id for i in graph_g.genotype.nodes}
+        assert set(controller.required_nodes.keys()) == {'a', 'b', 'c'}
+        assert node_ids != set()
+        for node_id in node_ids:
+            assert node_id in {'a', 'b', 'c'}
+    controller.game_over(1)
+    controller.game_over(2)
+    controller.game_over(3)
+    controller.game_over(4)
+    controller.game_over(5)
+    assert len(controller.graphs[0]) == 5
+    assert controller.graphs[0] != {}
+    print(f'graphs: {controller.graphs[0]}')
+    for graph_g in controller.graphs[0].values():
+        node_ids = {i.id for i in graph_g.genotype.nodes}
+        assert set(controller.required_nodes.keys()) == {'a', 'b', 'c'}
+        assert node_ids != set()
+        for node_id in node_ids:
+            assert node_id in {'a', 'b', 'c'}
+
+if __name__ == '__main__':
+    test_neat_controller_breeding()
