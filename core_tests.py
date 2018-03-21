@@ -1,6 +1,7 @@
 import pytest
 import core
 import random
+from math import exp
 
 def test_graph():
     graph = core.Graph({
@@ -10,7 +11,12 @@ def test_graph():
         'b': {'nodes': [], 'type': 'enter'},
         'a': {'nodes': [], 'type': 'enter'}
     })
-    assert graph.run({'a': 1, 'b': 1, 'd': 1}) == ([1.0, 2.0], ['e', 'c'])
+    a = graph.run({'a': 1, 'b': 1, 'd': 1})
+    assert a[0][0] > 0.73
+    assert a[0][0] < 0.74
+    assert a[0][1] > 1.46
+    assert a[0][1] < 1.47
+    #assert graph.run({'a': 1, 'b': 1, 'd': 1}) == ([1/(1+exp(-1)), 1/(1+exp(-2))], ['e', 'c'])
 
 def test_graph_disconnected():
     graph = core.Graph({
@@ -58,7 +64,12 @@ def test_neat_graph_run():
             2: core.ConnGene('b', 'c', 1.0, True),
             3: core.ConnGene('d', 'e', 1.0, True)
         }, mutation_rate=100))
-    assert ngraph.run({'a': 1, 'b': 1, 'd': 1}) == ([1.0, 2.0], ['e', 'c'])
+    a = ngraph.run({'a': 1, 'b': 1, 'd': 1})
+    assert a[0][0] > 0.73
+    assert a[0][0] < 0.74
+    assert a[0][1] > 1.46
+    assert a[0][1] < 1.47
+    #assert ngraph.run({'a': 1, 'b': 1, 'd': 1}) == ([0.7310586, 1.4621172], ['e', 'c'])
 
 def test_graph_empty():
     graph = core.Graph({})
