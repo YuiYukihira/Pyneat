@@ -1,4 +1,4 @@
-import core
+import pyneat
 import random
 
 training_list = [
@@ -62,5 +62,5 @@ def train(cycles, controller):
 
 if __name__ == '__main__':
     random.seed(1)
-    controller = core.NeatController(1, 20, {'a': 'enter', 'b': 'enter', 'c': 'exit'})
+    controller = pyneat.Controller(1, 20, {'a': 'enter', 'b': 'enter', 'c': 'exit'})
     train(5000, controller)

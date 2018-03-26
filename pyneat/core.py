@@ -70,14 +70,13 @@ class Graph:
                                     bias = n[2]
                                     break
                             add_list.append(
-                                ((
+                                (
                                     work_nodes[i_node]*tf.constant(
                                         weight, dtype=tf.float32
                                     )
                                 )+tf.constant(
                                     bias, dtype=tf.float32
                                 ))
-                            )
                     else:
                         add_list.append(tf.constant(0.0, dtype=tf.float32)) # If there isn't an input node. create a fake input that outputs zero as tensorflow requires a tensor to have an input.
                     work_nodes[node] = tf.add_n(add_list, name=node) # Create a new tensor that sums all the nodes together and add it to work_nodes with the id as the key.

@@ -1,4 +1,4 @@
-import core
+import pyneat
 import math
 import curses
 from time import sleep
@@ -26,7 +26,7 @@ class PoleTester:
         self.high_scores_win = curses.newwin(8, 30, 0, 41)
         self.genome_win = curses.newwin(20, 40, 8, 0)
         self.high_genome_win = curses.newwin(20, 40, 8, 41)
-        self.controller = core.NeatController(10, 10, {'a': 'enter', 'v': 'enter', 'w': 'exit'})
+        self.controller = pyneat.Controller(10, 10, {'a': 'enter', 'v': 'enter', 'w': 'exit'})
         self.dt = dt
         self.start_angle = start_angle
         self.mass = mass
