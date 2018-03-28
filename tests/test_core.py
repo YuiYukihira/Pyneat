@@ -2,6 +2,7 @@ import pytest
 import pyneat
 import random
 from math import exp
+import time
 
 def test_graph():
     graph = pyneat.Graph({
@@ -132,6 +133,13 @@ def test_neat_controller_breeding():
         assert node_ids != set()
         for node_id in node_ids:
             assert node_id in {'a', 'b', 'c'}
+
+def test_multithreaded_controller():
+    start = time.perf_counter()
+    controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c':exit})
+    end = time.perf_counter()
+    print(f'time taken: {end-start}')
+    assert end-start < 5
 
 if __name__ == '__main__':
     test_graph()

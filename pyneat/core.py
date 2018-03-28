@@ -178,47 +178,22 @@ class NeatGraph:
         return self.phenotype.run(ins)
 
 
-
-class NeatController:
-    """Controlls the NEAT process."""
-    __slots__ = ['genera_count', 'species_count', 'graphs', 'scores', 'global_innov', 'current', 'required_nodes']
-    def __init__(self, genera: int, species: int, required_nodes: Dict[str, str]):
-        self.genera_count = genera
-        self.species_count = species
-        self.graphs = {}
-        self.scores = {}
-        self.global_innov = 0
-        self.current = (0, 0)
+class BreedController:
+    __slots__ = ['global_innov', 'required_nodes', 'scores', 'graphs', 'species_count', 'genera_count']
+    def __init__(self, global_innov, required_nodes, scores, graphs, species_count, genera_count):
+        self.global_innov = global_innov
         self.required_nodes = required_nodes
-        for i in range(0, self.genera_count):
-            self.graphs[i] = {}
-            self.scores[i] = {}
-            for j in range(0, self.species_count):
-                self.graphs[i][j] = NeatGraph(Genotype([
-                    NodeGene(i, j) for i, j in self.required_nodes.items()],{},random.randint(0,100)))
-                self.scores[i][j] = 0
+        self.scores = scores
+        self.graphs = graphs
+        self.species_count = species_count
+        self.genera_count = genera_count
 
-    def run(self, inputs):
-        """Return the output of the current graph's run method."""
-        return self.graphs[self.current[0]][self.current[1]].run(inputs)
-
-    def game_over(self, score):
-        """assign score to the current graph and move onto the next one. If no graphs left, call the breed method."""
-        self.scores[self.current[0]][self.current[1]] = score
-        if self.current == (self.genera_count - 1, self.species_count - 1):
-            self.current = (0, 0)
-            self.breed()
-        elif self.current[1] == self.species_count - 1:
-            self.current = (self.current[0] + 1, 0)
-        else:
-            self.current = (self.current[0], self.current[1] + 1)
-
-    #TODO: Make this multithreaded.
-    def _process_genera(self, genera):
-        graphs_copy = self.scores.copy()
+    def run(self, genera):
+        logging.debug(f'Started Process for genera: {genera}')
         top5 = {}
         new_graphs = {}
         child_counter = 0
+        graphs_copy = self.scores.copy()
 
         for i in range(0, 5): # Find the top 5 scoring graphs in the genera.
             top = max(graphs_copy[genera].keys(), key=(lambda key: graphs_copy[genera][key]))
@@ -233,8 +208,8 @@ class NeatController:
                 b_graph = b_tuple[0]
                 b_score = b_tuple[1]
                 if a_graph != b_graph: # Only breed if the two graphs are different.
-                    a_genotype = b_graph.genotype
-                    b_genotype = b_graph.genotype
+                    a_genotype = a_graph
+                    b_genotype = b_graph
                     if a_score > b_score: # Get the child's mutation rate from the most fit parent. If they are the same fitness, select randomly.
                         mutation_rate = a_genotype.mutation_rate
                     elif b_score > a_score:
@@ -344,26 +319,60 @@ class NeatController:
                                 sign = random.randint(1,2)
                                 amount = random.random()*2
                                 c_genotype.conns[conn].weight = amount if sign == 1 else -amount
-                    new_graphs[child_counter] = NeatGraph(c_genotype) # Make a NeatGraph from the genotype and add it test the list.
+                    new_graphs[child_counter] = c_genotype
                     child_counter += 1
                     if child_counter == self.species_count: # If we've hit the amount of children needed.
                         #return new_graphs # return the new graphs for this genera.
-                        queue.put((generaId, new_graphs))
-                        return
+                        logging.debug(f'Ending proccess for genera: {genera}')
+                        return [genera, new_graphs]
+
+
+class NeatController:
+    """Controlls the NEAT process."""
+    __slots__ = ['genera_count', 'species_count', 'graphs', 'scores', 'global_innov', 'current', 'required_nodes']
+    def __init__(self, genera: int, species: int, required_nodes: Dict[str, str]):
+        self.genera_count = genera
+        self.species_count = species
+        self.graphs = {}
+        self.scores = {}
+        self.global_innov = 0
+        self.current = (0, 0)
+        self.required_nodes = required_nodes
+        for i in range(0, self.genera_count):
+            self.graphs[i] = {}
+            self.scores[i] = {}
+            for j in range(0, self.species_count):
+                self.graphs[i][j] = NeatGraph(Genotype([
+                    NodeGene(i, j) for i, j in self.required_nodes.items()],{},random.randint(0,100)))
+                self.scores[i][j] = 0
+
+    def run(self, inputs):
+        """Return the output of the current graph's run method."""
+        return self.graphs[self.current[0]][self.current[1]].run(inputs)
+
+    def game_over(self, score):
+        """assign score to the current graph and move onto the next one. If no graphs left, call the breed method."""
+        self.scores[self.current[0]][self.current[1]] = score
+        if self.current == (self.genera_count - 1, self.species_count - 1):
+            self.current = (0, 0)
+            self.breed()
+        elif self.current[1] == self.species_count - 1:
+            self.current = (self.current[0] + 1, 0)
+        else:
+            self.current = (self.current[0], self.current[1] + 1)
 
     def breed(self):
         new_graphs = {}
         procs = [] # Create our list of processes
-        queue = multiprocessing.SimpleQueue() # Create our queue of results from our processes.
+        pool = multiprocessing.Pool(THREAD_COUNT)
         for genera in range(0, len(self.graphs), THREAD_COUNT): # For every genera.
-            for proc in range(genera, genera+THREAD_COUNT):
-                p = multiprocessing.Process(target=self._process_genera, args=(self.graphs[genera], genera, queue)) # Create a new process for the genera
-                p.start() # Start the process
-                procs.append(p) # Add the process to the list of proceses
-            for p in procs: # wait for all our processes to finish
-                p.join()
-
-            while not queue.empty(): # empty the queue into a dict.
-                i = queue.get()
-                new_graphs[i[0]] = i[1]
+            bController = BreedController(self.global_innov, self.required_nodes, self.scores, {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in self.graphs.items()}, self.species_count, self.genera_count)
+            if len(self.graphs)-genera < THREAD_COUNT:
+                ins = [genera for i in range(genera, len(self.graphs))]
+            else:
+                ins = [genera for i in range(genera, genera+THREAD_COUNT)]
+            results = pool.map(bController.run, ins)
+            print(results)
+            for result in results:
+                new_graphs[result[0]] = {i: NeatGraph(j) for i, j in result[1].items()}
         self.graphs = new_graphs # replace the graphs with the new ones.
