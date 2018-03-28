@@ -2,12 +2,17 @@ import logging
 import random
 from uuid import uuid4
 from typing import Dict, List, Union, Tuple
+import multiprocessing
 
 import tensorflow as tf
 
 ## Define types
 
 GRAPH_SHAPE = Dict[str, Dict[str, Union[str, List[Tuple[str, float, float]]]]]
+
+## Define Constants
+
+THREAD_COUNT = multiprocessing.cpu_count()-1
 
 class Graph:
     """A base graph, defines a shape and also creates and stores a tensorflow graph."""
@@ -176,6 +181,7 @@ class NeatGraph:
 
 class NeatController:
     """Controlls the NEAT process."""
+    __slots__ = ['genera_count', 'species_count', 'graphs', 'scores', 'global_innov', 'current', 'required_nodes']
     def __init__(self, genera: int, species: int, required_nodes: Dict[str, str]):
         self.genera_count = genera
         self.species_count = species
@@ -341,10 +347,23 @@ class NeatController:
                     new_graphs[child_counter] = NeatGraph(c_genotype) # Make a NeatGraph from the genotype and add it test the list.
                     child_counter += 1
                     if child_counter == self.species_count: # If we've hit the amount of children needed.
-                        return new_graphs # return the new graphs for this genera.
+                        #return new_graphs # return the new graphs for this genera.
+                        queue.put((generaId, new_graphs))
+                        return
+
     def breed(self):
         new_graphs = {}
-        for genera in self.graphs: # For every genera.
-            n = self._process_genera(genera) # Get the new graphs for this genera.
-            new_graphs[genera] = n # Set the genera to the new values
+        procs = [] # Create our list of processes
+        queue = multiprocessing.SimpleQueue() # Create our queue of results from our processes.
+        for genera in range(0, len(self.graphs), THREAD_COUNT): # For every genera.
+            for proc in range(genera, genera+THREAD_COUNT):
+                p = multiprocessing.Process(target=self._process_genera, args=(self.graphs[genera], genera, queue)) # Create a new process for the genera
+                p.start() # Start the process
+                procs.append(p) # Add the process to the list of proceses
+            for p in procs: # wait for all our processes to finish
+                p.join()
+
+            while not queue.empty(): # empty the queue into a dict.
+                i = queue.get()
+                new_graphs[i[0]] = i[1]
         self.graphs = new_graphs # replace the graphs with the new ones.
