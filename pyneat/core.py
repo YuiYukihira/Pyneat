@@ -207,6 +207,7 @@ class NeatController:
         else:
             self.current = (self.current[0], self.current[1] + 1)
 
+    #TODO: Make this multithreaded.
     def _process_genera(self, genera):
         graphs_copy = self.scores.copy()
         top5 = {}
