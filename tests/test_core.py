@@ -18,7 +18,6 @@ def test_graph():
     assert a[0][0] < 0.732
     assert a[0][1] > 1.462
     assert a[0][1] < 1.463
-    #assert graph.run({'a': 1, 'b': 1, 'd': 1}) == ([1/(1+exp(-1)), 1/(1+exp(-2))], ['e', 'c'])
 
 def test_graph_disconnected():
     graph = pyneat.Graph({
@@ -71,7 +70,6 @@ def test_neat_graph_run():
     assert a[0][0] < 0.74
     assert a[0][1] > 1.46
     assert a[0][1] < 1.47
-    #assert ngraph.run({'a': 1, 'b': 1, 'd': 1}) == ([0.7310586, 1.4621172], ['e', 'c'])
 
 def test_graph_empty():
     graph = pyneat.Graph({})
@@ -134,12 +132,31 @@ def test_neat_controller_breeding():
         for node_id in node_ids:
             assert node_id in {'a', 'b', 'c'}
 
+def test_breed_repopulation():
+    try:
+        controller = pyneat.Controller(5,5,{'a':'enter','b':'enter','c':'exit'})
+        assert controller.genera_count==5 and controller.species_count==5
+        assert len(controller.graphs)==5
+        for genera in controller.graphs.values():
+            assert len(genera)==5
+            for i in range(0, 25):
+                controller.game_over(i)
+        assert controller.genera_count==5 and controller.species_count==5
+        assert len(controller.graphs)==5
+        for genera in controller.graphs.values():
+            assert len(genera)==5
+        for i in range(0, 25):
+            controller.game_over(i)
+        assert controller.genera_count==5 and controller.species_count==5
+        assert len(controller.graphs)==5
+        for genera in controller.graphs.values():
+            assert len(genera)==5
+    except AssertionError as e:
+        print(e)
+
 def test_multithreaded_controller():
     start = time.perf_counter()
     controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c':exit})
     end = time.perf_counter()
     print(f'time taken: {end-start}')
     assert end-start < 5
-
-if __name__ == '__main__':
-    test_graph()

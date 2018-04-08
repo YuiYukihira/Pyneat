@@ -5,7 +5,7 @@ from typing import Dict, List, Union, Tuple
 import multiprocessing
 
 import tensorflow as tf
-
+import os
 ## Define types
 
 GRAPH_SHAPE = Dict[str, Dict[str, Union[str, List[Tuple[str, float, float]]]]]
@@ -13,6 +13,8 @@ GRAPH_SHAPE = Dict[str, Dict[str, Union[str, List[Tuple[str, float, float]]]]]
 ## Define Constants
 
 THREAD_COUNT = multiprocessing.cpu_count()-1
+
+logging.basicConfig(filename='pyneat.log', level=logging.DEBUG)
 
 class Graph:
     """A base graph, defines a shape and also creates and stores a tensorflow graph."""
@@ -158,15 +160,15 @@ class NeatGraph:
         """The information in the Genotype class is not in the correct format so we have to convert it for the graph class."""
         usable = {} # Dictionary of previously computed nodes.
         for node in genotype.nodes: # For every node in the genotype.
-            logging.debug(f'node: {node}')
+            #logging.debug(f'node: {node}')
             ins = [] # List of nodes that input into this one.
             for conn in genotype.conns.values(): # For all the values in the genotype connections.
-                logging.debug(f'\tconn: {conn}')
+                #logging.debug(f'\tconn: {conn}')
                 if conn.out_node == node.id: # Does this connection have the node as it's output node?
                     ins.append((conn.in_node, conn.weight if conn.enabled else 0, 0)) # Add the input node into in's with the id and weight and a bias of 0 as we don't use them.
-                    logging.debug(f'\t\tins: {ins}')
+                    #logging.debug(f'\t\tins: {ins}')
             usable[node.id] = {'nodes': ins, 'type': node.type} # Add the input nodes to the useable dict with the node id as the key.
-            logging.debug(f'\tusable: {usable}')
+            #logging.debug(f'\tusable: {usable}')
         return usable # Return the usable genes.
 
     def recalculate_phenotype(self):
@@ -189,7 +191,7 @@ class BreedController:
         self.genera_count = genera_count
 
     def run(self, genera):
-        logging.debug(f'Started Process for genera: {genera}')
+        logging.debug(f'##Starting process {os.getpid()} for genera: {genera}')
         top5 = {}
         new_graphs = {}
         child_counter = 0
@@ -221,7 +223,7 @@ class BreedController:
                     for innov_counter in range(0, self.global_innov): # Repeat until we reach the global innovation score counter
                         a_gene = a_genotype.conns.get(innov_counter)
                         b_gene = b_genotype.conns.get(innov_counter)
-                        if a_gene and b_gene:
+                        if a_gene is not None and b_gene is not None:
                             # Gene present in both parents.
                             if a_score > b_score:
                                 # A is fitter, so inherit gene from a.
@@ -323,13 +325,23 @@ class BreedController:
                     child_counter += 1
                     if child_counter == self.species_count: # If we've hit the amount of children needed.
                         #return new_graphs # return the new graphs for this genera.
-                        logging.debug(f'Ending proccess for genera: {genera}')
+                        logging.debug(f'##Ending proccess {os.getpid()} for genera: {genera}')
                         return [genera, new_graphs]
 
 
 class NeatController:
     """Controlls the NEAT process."""
-    __slots__ = ['genera_count', 'species_count', 'graphs', 'scores', 'global_innov', 'current', 'required_nodes']
+    __slots__ = [
+        'genera_count',
+        'species_count',
+        'graphs',
+        'scores',
+        'global_innov',
+        'current',
+        'required_nodes',
+        'bstart_callbacks',
+        'bend_callbacks',
+        'bstatus_callbacks']
     def __init__(self, genera: int, species: int, required_nodes: Dict[str, str]):
         self.genera_count = genera
         self.species_count = species
@@ -338,6 +350,8 @@ class NeatController:
         self.global_innov = 0
         self.current = (0, 0)
         self.required_nodes = required_nodes
+        self.bstart_callbacks = []
+        self.bend_callbacks = []
         for i in range(0, self.genera_count):
             self.graphs[i] = {}
             self.scores[i] = {}
@@ -345,6 +359,10 @@ class NeatController:
                 self.graphs[i][j] = NeatGraph(Genotype([
                     NodeGene(i, j) for i, j in self.required_nodes.items()],{},random.randint(0,100)))
                 self.scores[i][j] = 0
+
+    @property
+    def current_graph(self):
+        return self.graphs[self.current[0]][self.current[1]]
 
     def run(self, inputs):
         """Return the output of the current graph's run method."""
@@ -361,18 +379,33 @@ class NeatController:
         else:
             self.current = (self.current[0], self.current[1] + 1)
 
+    def add_breed_start_callback(self, cb):
+        """Add a function to be called then the breeding is started"""
+        self.bstart_callbacks.append(cb)
+
+    def add_breed_end_callback(self, cb):
+        """Add a funciton to be called when the breeding is finished."""
+        self.bend_callbacks.append(cb)
+
     def breed(self):
-        new_graphs = {}
-        procs = [] # Create our list of processes
-        pool = multiprocessing.Pool(THREAD_COUNT)
-        for genera in range(0, len(self.graphs), THREAD_COUNT): # For every genera.
-            bController = BreedController(self.global_innov, self.required_nodes, self.scores, {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in self.graphs.items()}, self.species_count, self.genera_count)
-            if len(self.graphs)-genera < THREAD_COUNT:
-                ins = [genera for i in range(genera, len(self.graphs))]
-            else:
-                ins = [genera for i in range(genera, genera+THREAD_COUNT)]
-            results = pool.map(bController.run, ins)
-            print(results)
-            for result in results:
-                new_graphs[result[0]] = {i: NeatGraph(j) for i, j in result[1].items()}
+        logging.debug('###################BREEDING STARTED#################')
+        for cb in self.bstart_callbacks: # Run all our start callbacks,
+            cb(self)
+        new_graphs = {} # Create a new dict for our new graphs.
+        pool = multiprocessing.Pool(THREAD_COUNT) # Create a new pool for our processes.
+        ins = [i for i in range(0, self.genera_count)]
+        bController = BreedController(
+            self.global_innov,
+            self.required_nodes,
+            self.scores,
+            {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in self.graphs.items()},
+            self.species_count,
+            self.genera_count
+        )
+        results = pool.map(bController.run, ins) # Get our results from our pool.
+        for result in results:
+            new_graphs[result[0]] = {i: NeatGraph(j) for i, j in result[1].items()} # Add our results to new_graphs converting the genotypes into NeatGraphs.
         self.graphs = new_graphs # replace the graphs with the new ones.
+        for cb in self.bend_callbacks: # Run our end callbacks.
+            cb(self)
+        logging.debug('#####################BREEDING ENDED####################')
