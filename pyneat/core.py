@@ -2,6 +2,7 @@ import logging
 import random
 from uuid import uuid4
 from typing import Dict, List, Union, Tuple
+from dataclasses import dataclass
 import multiprocessing
 
 import tensorflow as tf
@@ -27,7 +28,7 @@ class Graph:
             }
         }
         """
-        logging.info('Compute Graph Created!')
+#        logging.info('Compute Graph Created!')
         self.shape = shape
         self.working = tf.Graph()
         self.exit_nodes = []
@@ -38,7 +39,7 @@ class Graph:
 
     def run(self, ins: Dict[str, Union[int, float]]) -> Tuple[List[float], List[str]]:
         """Takes a dictionary of input node name, and value. Returns a tuple of a list of output values, and a list of output nodes."""
-        logging.info('Compute Graph executed!')
+#        logging.info('Compute Graph executed!')
         fetches = [i+':0' for i in self.exit_nodes] # Rename the node names so we get the tensorflow ID's (this only works if the nodes have unique names.)
         new_ins = {}
         for key in ins.keys():
@@ -57,7 +58,7 @@ class Graph:
 
     def create_working(self):
         """Called internally, fills the Tensorflow Graph "working" with the data from "shape"."""
-        logging.info('Creating workable compute graph!')
+#        logging.info('Creating workable compute graph!')
         work_nodes = {} # A dictionary for storing our previously computed nodes.
 
         def make_node(node):
@@ -93,20 +94,20 @@ class Graph:
             for node in self.shape:
                 make_node(node) # Make every node in the shape.
 
+@dataclass
 class NodeGene:
     """
     Holds information about a node gene.
     id: node id. (a string)
     type: node type. (one of: "enter", "hidden", "exit")
     """
+
+    id: str
+    type: str
+
     __slots__ = ["id", "type"]
-    def __init__(self, node_id: str, node_type: str):
-        self.id = node_id
-        self.type = node_type
 
-    def __str__(self):
-        return f'id: {self.id}, type: {self.type}'
-
+@dataclass
 class ConnGene:
     """
     Holds information about a connection gene.
@@ -115,18 +116,15 @@ class ConnGene:
     weight: the connection weight. (a float)
     enabled: whether the connection is enabled. (a bool)
     """
+
+    in_node: str
+    out_node: str
+    weight: float
+    enabled: bool
+
     __slots__ = ["in_node", "out_node", "weight", "enabled"]
-    def __init__(self, in_node: str, out_node: str, weight: float, enabled: bool):
-        self.in_node = in_node
-        self.out_node = out_node
-        self.weight = weight
-        self.enabled = enabled
 
-    def __str__(self):
-        return f'in: {self.in_node}, out: {self.out_node}, weight: {self.weight}, enabled: {self.enabled}'
-
-
-
+@dataclass
 class Genotype:
     """
     Holds information on a genotype.
@@ -134,24 +132,19 @@ class Genotype:
     conns: the connection genes. (a dictionary of key innovation score (int) and value ConnGene instances)
     mutation_rate: determines how likely this graph is to mutate.
     """
-    __slots__ = ['nodes', 'conns', 'mutation_rate']
-    def __init__(self, nodes: List[NodeGene], conns: Dict[int, ConnGene], mutation_rate: int):
-        self.nodes = nodes
-        self.conns = conns
-        self.mutation_rate = mutation_rate
 
-    def __str__(self):
-        nodes = '\n'.join('\t'+str(i) for i in self.nodes)
-        conns = '\n'.join('\t'+str(i) for i in self.conns.values())
-        string = f'nodes: {nodes}\nconns: {conns}\nmutation rate: {self.mutation_rate}'
-        return string
+    nodes: List[NodeGene]
+    conns: Dict[int, ConnGene]
+    mutation_rate: int
+
+    __slots__ = ['nodes', 'conns', 'mutation_rate']
 
 class NeatGraph:
     """
     A graph that has a genotype that follows the NEAT style and a phenotype that uses tensorflow for computation.
     """
     def __init__(self, genes: Genotype):
-        logging.info('NEAT Graph created!')
+#        logging.info('NEAT Graph created!')
         self.genotype = genes
         self.phenotype = Graph(self.convert_genes_to_usable_format(self.genotype)) # create our phenotype from our genes.
 
@@ -209,7 +202,7 @@ class BreedController:
                 # Make the Graph B.
                 b_graph = b_tuple[0]
                 b_score = b_tuple[1]
-                if a_graph != b_graph: # Only breed if the two graphs are different.
+                if a_graph is not b_graph: # Only breed if the two graphs are different.
                     a_genotype = a_graph
                     b_genotype = b_graph
                     if a_score > b_score: # Get the child's mutation rate from the most fit parent. If they are the same fitness, select randomly.
@@ -241,11 +234,11 @@ class BreedController:
                         elif a_gene and b_gene is None:
                             # gene not present in b, so inherit from a.
                             needed_nodes |= {a_gene.in_node, a_gene.out_node}
-                            c_genotype.conns[innov_counter] = gene
+                            c_genotype.conns[innov_counter] = a_gene
                         elif b_gene and a_gene is None:
                             # gene not present in a, so inherit from b.
                             needed_nodes |= {b_gene.in_node, b_gene.out_node}
-                            c_genotype.conns[innov_counter] = genera
+                            c_genotype.conns[innov_counter] = b_gene
                     for node_id, node_type in self.required_nodes.items(): # Add the node genes with information if they are from the required nodes.
                         if node_id in needed_nodes:
                             c_genotype.nodes.append(NodeGene(node_id, node_type))
@@ -326,7 +319,7 @@ class BreedController:
                     if child_counter == self.species_count: # If we've hit the amount of children needed.
                         #return new_graphs # return the new graphs for this genera.
                         logging.debug(f'##Ending proccess {os.getpid()} for genera: {genera}')
-                        return [genera, new_graphs]
+                        return [genera, new_graphs, self.global_innov]
 
 
 class NeatController:
@@ -388,7 +381,6 @@ class NeatController:
         self.bend_callbacks.append(cb)
 
     def breed(self):
-        logging.debug('###################BREEDING STARTED#################')
         for cb in self.bstart_callbacks: # Run all our start callbacks,
             cb(self)
         new_graphs = {} # Create a new dict for our new graphs.
@@ -404,8 +396,9 @@ class NeatController:
         )
         results = pool.map(bController.run, ins) # Get our results from our pool.
         for result in results:
+            print(f'RESULT: {type(result)}')
             new_graphs[result[0]] = {i: NeatGraph(j) for i, j in result[1].items()} # Add our results to new_graphs converting the genotypes into NeatGraphs.
+        self.global_innov = max(i[2] for i in results)
         self.graphs = new_graphs # replace the graphs with the new ones.
         for cb in self.bend_callbacks: # Run our end callbacks.
             cb(self)
-        logging.debug('#####################BREEDING ENDED####################')

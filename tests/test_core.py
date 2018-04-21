@@ -155,8 +155,11 @@ def test_breed_repopulation():
         print(e)
 
 def test_multithreaded_controller():
-    start = time.perf_counter()
-    controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c':exit})
-    end = time.perf_counter()
-    print(f'time taken: {end-start}')
-    assert end-start < 5
+    times = []
+    for i in range(10):
+        start = time.perf_counter()
+        controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c':exit})
+        end = time.perf_counter()
+        print(f'time taken: {end-start}')
+        times.append(end-start)
+    assert sum(times)/len(times) < 6
