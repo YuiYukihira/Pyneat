@@ -18,7 +18,8 @@ THREAD_COUNT = multiprocessing.cpu_count()-1
 logging.basicConfig(filename='pyneat.log', level=logging.DEBUG)
 
 class Graph:
-    """A base graph, defines a shape and also creates and stores a tensorflow graph."""
+    """A base graph, defines a shape and
+    also creates and stores a tensorflow graph."""
     def __init__(self, shape: GRAPH_SHAPE):
         """
         shape: dict{
@@ -38,40 +39,55 @@ class Graph:
                 self.exit_nodes.append(key)
 
     def run(self, ins: Dict[str, Union[int, float]]) -> Tuple[List[float], List[str]]:
-        """Takes a dictionary of input node name, and value. Returns a tuple of a list of output values, and a list of output nodes."""
+        """Takes a dictionary of input node name, and value.
+        Returns a tuple of a list of output values,
+        and a list of output nodes."""
 #        logging.info('Compute Graph executed!')
-        fetches = [i+':0' for i in self.exit_nodes] # Rename the node names so we get the tensorflow ID's (this only works if the nodes have unique names.)
+        # Rename the node names so we get the tensorflow ID's
+        # (this only works if the nodes have unique names.)
+        fetches = [i+':0' for i in self.exit_nodes]
         new_ins = {}
+        # Rename the node names so we get the tensorflow ID's
+        # (this only works if the nodes have unique names.)
         for key in ins.keys():
-            new_ins[key+':0'] = ins[key] # Rename the node names so we get the tensorflow ID's (this only works if the nodes have unique names.)
+            new_ins[key+':0'] = ins[key]
 
         if fetches:
-            with tf.Session(graph=self.working) as sess: # Create a temporary tensorflow session called sess which uses our graph.
-                return (sess.run(fetches, new_ins), self.exit_nodes) # Fetch and return the output.
-
-    def create_picture(self):
-        """Writes a picute of the graph for TensorBoard to use."""
-        with tf.Session(graph=self.working) as sess:
-            writer = tf.summary.FileWriter('logs/', sess.graph)
-            self.run({'a': 0.5, 'b': 0.4})
-            writer.close()
+            # Create a temporary tensorflow session called
+            # sess which uses our graph.
+            with tf.Session(graph=self.working) as sess:
+                # Fetch and return the output.
+                return (sess.run(fetches, new_ins), self.exit_nodes)
 
     def create_working(self):
-        """Called internally, fills the Tensorflow Graph "working" with the data from "shape"."""
+        """Called internally,
+        fills the Tensorflow Graph "working"
+        with the data from "shape"."""
 #        logging.info('Creating workable compute graph!')
-        work_nodes = {} # A dictionary for storing our previously computed nodes.
+        # A dictionary for storing our previously computed nodes.
+        work_nodes = {}
 
         def make_node(node):
-            """Recursive function for populating the graph with the information"""
+            """Recursive function for populating
+            the graph with the information"""
             with self.working.as_default():
-                enter_nodes = set(i[0] for i in self.shape[node]['nodes']) # Find the nodes that enter the target node.
-                missing_nodes = enter_nodes - set(work_nodes.keys()) # Find the nodes not yet in work_nodes.
+                # Find the nodes that enter the target node.
+                enter_nodes = set(
+                    i[0] for i in self.shape[node]['nodes'])
+                # Find the nodes not yet in work_nodes.
+                missing_nodes = enter_nodes - set(work_nodes.keys())
                 for i_node in missing_nodes:
-                    make_node(i_node) # Run this function on the missing nodes.
-                if self.shape[node]['type'] in ['hidden', 'exit']: # If the node is a 'hidden' or 'exit' node.
+                    # Run this function on the missing nodes.
+                    make_node(i_node)
+                # If the node is a 'hidden' or 'exit' node.
+                if self.shape[node]['type'] in ['hidden', 'exit']:
                     add_list = []
-                    if enter_nodes != set(): # Check that there nodes entering this node.
-                        for i_node in enter_nodes: # If there is, add a node into the graph with the previous node, the weight and bias.
+                    # Check that there nodes entering this node.
+                    if enter_nodes != set():
+                        # If there is, add a node into
+                        # the graph with the previous node,
+                        # the weight and bias.
+                        for i_node in enter_nodes:
                             for n in self.shape[node]['nodes']:
                                 if n[0] == i_node:
                                     weight = n[1]
@@ -86,10 +102,23 @@ class Graph:
                                     bias, dtype=tf.float32
                                 ))
                     else:
-                        add_list.append(tf.constant(0.0, dtype=tf.float32)) # If there isn't an input node. create a fake input that outputs zero as tensorflow requires a tensor to have an input.
-                    work_nodes[node] = tf.add_n(add_list, name=node) # Create a new tensor that sums all the nodes together and add it to work_nodes with the id as the key.
-                elif self.shape[node]['type'] == 'enter': # If the node if type 'enter'
-                    work_nodes[node] = tf.sigmoid(tf.placeholder(tf.float32, name=node)) # Create a new placeholder tensor and add it to work_nodes ith the id as the key.
+                        # If there isn't an input node.
+                        # create a fake input that outputs zero
+                        # as tensorflow requires a tensor
+                        # to have an input.
+                        add_list.append(
+                            tf.constant(0.0, dtype=tf.float32))
+                    # Create a new tensor that sums all
+                    # the nodes together and add it to
+                    # work_nodes with the id as the key.
+                    work_nodes[node] = tf.add_n(add_list, name=node)
+                # If the node if type 'enter'
+                elif self.shape[node]['type'] == 'enter':
+                    # Create a new placeholder
+                    # tensor and add it to work_nodes
+                    # with the id as the key.
+                    work_nodes[node] = tf.sigmoid(
+                        tf.placeholder(tf.float32, name=node))
         with self.working.as_default():
             for node in self.shape:
                 make_node(node) # Make every node in the shape.
@@ -129,7 +158,9 @@ class Genotype:
     """
     Holds information on a genotype.
     nodes: the node genes. (a list of NodeGene instances)
-    conns: the connection genes. (a dictionary of key innovation score (int) and value ConnGene instances)
+    conns: the connection genes.
+    (a dictionary of key innovation score (int)
+    and value ConnGene instances)
     mutation_rate: determines how likely this graph is to mutate.
     """
 
@@ -141,26 +172,35 @@ class Genotype:
 
 class NeatGraph:
     """
-    A graph that has a genotype that follows the NEAT style and a phenotype that uses tensorflow for computation.
+    A graph that has a genotype that follows the NEAT style
+    and a phenotype that uses tensorflow for computation.
     """
     def __init__(self, genes: Genotype):
 #        logging.info('NEAT Graph created!')
         self.genotype = genes
-        self.phenotype = Graph(self.convert_genes_to_usable_format(self.genotype)) # create our phenotype from our genes.
+        # create our phenotype from our genes.
+        self.phenotype = Graph(
+            self.convert_genes_to_usable_format(self.genotype))
 
     @staticmethod
     def convert_genes_to_usable_format(genotype: Genotype) -> GRAPH_SHAPE:
-        """The information in the Genotype class is not in the correct format so we have to convert it for the graph class."""
+        """The information in the Genotype class is not in the correct format
+        so we have to convert it for the graph class."""
         usable = {} # Dictionary of previously computed nodes.
         for node in genotype.nodes: # For every node in the genotype.
             #logging.debug(f'node: {node}')
             ins = [] # List of nodes that input into this one.
-            for conn in genotype.conns.values(): # For all the values in the genotype connections.
+            # For all the values in the genotype connections.
+            for conn in genotype.conns.values():
                 #logging.debug(f'\tconn: {conn}')
-                if conn.out_node == node.id: # Does this connection have the node as it's output node?
-                    ins.append((conn.in_node, conn.weight if conn.enabled else 0, 0)) # Add the input node into in's with the id and weight and a bias of 0 as we don't use them.
+                # Does this connection have the node as it's output node?
+                if conn.out_node == node.id:
+                    # Add the input node into in's with the
+                    # id and weight. And a bias of 0 as we don't use it.
+                    ins.append((conn.in_node, conn.weight if conn.enabled else 0, 0))
                     #logging.debug(f'\t\tins: {ins}')
-            usable[node.id] = {'nodes': ins, 'type': node.type} # Add the input nodes to the useable dict with the node id as the key.
+            # Add the input nodes to the useable dict with the node id as the key.
+            usable[node.id] = {'nodes': ins, 'type': node.type}
             #logging.debug(f'\tusable: {usable}')
         return usable # Return the usable genes.
 
@@ -174,121 +214,184 @@ class NeatGraph:
 
 
 class BreedController:
-    __slots__ = ['global_innov', 'required_nodes', 'scores', 'graphs', 'species_count', 'genera_count']
-    def __init__(self, global_innov, required_nodes, scores, graphs, species_count, genera_count):
-        self.global_innov = global_innov
+    __slots__ = ['required_nodes', 'scores',
+                 'graphs', 'species_count', 'genera_count']
+    def __init__(self, required_nodes, scores,
+                 graphs, species_count, genera_count):
         self.required_nodes = required_nodes
         self.scores = scores
         self.graphs = graphs
         self.species_count = species_count
         self.genera_count = genera_count
 
-    def run(self, genera):
-        logging.debug(f'##Starting process {os.getpid()} for genera: {genera}')
+    def run(self, args):
+        genera = args[0]
+        innovation_dict = args[1]
+        innovation_lock = args[2]
+        print(f'0: {type(genera)}, 1: {type(innovation_dict)}, 2: {type(innovation_lock)}')
+        logging.debug(
+            f'##Starting process {os.getpid()} for genera: {genera}')
         top5 = {}
         new_graphs = {}
         child_counter = 0
         graphs_copy = self.scores.copy()
 
-        for i in range(0, 5): # Find the top 5 scoring graphs in the genera.
-            top = max(graphs_copy[genera].keys(), key=(lambda key: graphs_copy[genera][key]))
-            top5[top] = (self.graphs[genera][top], self.scores[genera][top])
+        # Find the top 5 scoring graphs in the genera.
+        for i in range(0, 5):
+            top = max(graphs_copy[genera].keys(),
+                      key=(lambda key: graphs_copy[genera][key]))
+            top5[top] = (
+                self.graphs[genera][top],
+                self.scores[genera][top])
             del graphs_copy[genera][top]
-        for a_tuple in top5.values(): # Repeat for each graph in the top 5.
+        # Repeat for each graph in the top 5.
+        for a_tuple in top5.values():
             # Make Graph A.
             a_graph = a_tuple[0]
             a_score = a_tuple[1]
-            for b_tuple in top5.values(): # Repeat for each graph in the top 5.
+            # Repeat for each graph in the top 5.
+            for b_tuple in top5.values():
                 # Make the Graph B.
                 b_graph = b_tuple[0]
                 b_score = b_tuple[1]
-                if a_graph is not b_graph: # Only breed if the two graphs are different.
+                # Only breed if the two graphs are different.
+                if a_graph is not b_graph:
                     a_genotype = a_graph
                     b_genotype = b_graph
-                    if a_score > b_score: # Get the child's mutation rate from the most fit parent. If they are the same fitness, select randomly.
+                    # Get the child's mutation rate
+                    # from the most fit parent.
+                    # If they are the same fitness,
+                    # select randomly.
+                    if a_score > b_score:
                         mutation_rate = a_genotype.mutation_rate
                     elif b_score > a_score:
                         mutation_rate = b_genotype.mutation_rate
                     else:
-                        mutation_rate = random.choice([b_genotype.mutation_rate, a_genotype.mutation_rate])
-                    c_genotype = Genotype([], {}, mutation_rate) # Create and empty genotype C for the child.
-                    needed_nodes = set(self.required_nodes.keys()) # Find the nodes that are required as a bare minimum and add them to the set of needed nodes.
-                    for innov_counter in range(0, self.global_innov): # Repeat until we reach the global innovation score counter
+                        mutation_rate = random.choice(
+                            [b_genotype.mutation_rate,
+                             a_genotype.mutation_rate])
+                    # Create and empty genotype C for the child.
+                    c_genotype = Genotype([], {}, mutation_rate)
+                    # Find the nodes that are required as a bare minimum
+                    # and add them to the set of needed nodes.
+                    needed_nodes = set(self.required_nodes.keys())
+                    # Repeat until we reach the
+                    # global innovation score counter
+                    try:
+                        max_innov = max(innovation_dict.keys())
+                    except ValueError:
+                        max_innov = 0
+                    for innov_counter in range(0, max_innov):
                         a_gene = a_genotype.conns.get(innov_counter)
                         b_gene = b_genotype.conns.get(innov_counter)
                         if a_gene is not None and b_gene is not None:
                             # Gene present in both parents.
                             if a_score > b_score:
                                 # A is fitter, so inherit gene from a.
-                                needed_nodes |= {a_gene.in_node, a_gene.out_node}
+                                needed_nodes |= {a_gene.in_node,
+                                                 a_gene.out_node}
                                 c_genotype.conns[innov_counter] = a_gene
                             elif b_score > a_score:
                                 # B is fitter, so inherit gene from b.
-                                needed_nodes |= {b_gene.in_node, b_gene.out_node}
+                                needed_nodes |= {b_gene.in_node,
+                                                 b_gene.out_node}
                                 c_genotype.conns[innov_counter] = b_gene
                             else:
                                 # A is as fit as B so select randomly.
                                 gene = random.choice([a_gene, b_gene])
-                                needed_nodes |= {gene.in_node, gene.out_node}
+                                needed_nodes |= {gene.in_node,
+                                                 gene.out_node}
                                 c_genotype.conns[innov_counter] = gene
                         elif a_gene and b_gene is None:
                             # gene not present in b, so inherit from a.
-                            needed_nodes |= {a_gene.in_node, a_gene.out_node}
+                            needed_nodes |= {a_gene.in_node,
+                                             a_gene.out_node}
                             c_genotype.conns[innov_counter] = a_gene
                         elif b_gene and a_gene is None:
                             # gene not present in a, so inherit from b.
-                            needed_nodes |= {b_gene.in_node, b_gene.out_node}
+                            needed_nodes |= {b_gene.in_node,
+                                             b_gene.out_node}
                             c_genotype.conns[innov_counter] = b_gene
-                    for node_id, node_type in self.required_nodes.items(): # Add the node genes with information if they are from the required nodes.
+                    # Add the node genes with information
+                    # if they are from the required nodes.
+                    for node_id, node_type in self.required_nodes.items():
                         if node_id in needed_nodes:
-                            c_genotype.nodes.append(NodeGene(node_id, node_type))
+                            c_genotype.nodes.append(
+                                NodeGene(node_id, node_type))
                             needed_nodes -= {node_id}
                     if needed_nodes: # If there are still nodes left.
-                        for node in a_genotype.nodes: # Add the node genes with information from genotype A.
+                        # Add the node genes with
+                        # information from genotype A.
+                        for node in a_genotype.nodes: #
                             if node.id in needed_nodes:
                                 c_genotype.nodes.append(node)
                                 needed_nodes -= {node.id}
                     if needed_nodes: # If there are still nodes left.
-                        for node in b_genotype.nodes: # Add the node genes with information from genotype B.
+                        # Add the node genes with
+                        # information from genotype B.
+                        for node in b_genotype.nodes:
                             if node.id in needed_nodes:
                                 c_genotype.nodes.append(node)
                                 needed_nodes -= {node.id}
-                    if random.randint(0, 100) < c_genotype.mutation_rate: # Mutate the C genotype if it passes the check.
+                    # Mutate the C genotype if it passes the check.
+                    if random.randint(0, 100) < c_genotype.mutation_rate:
                         choice = random.randint(0,4)
                         if choice == 0:
                             # Change mutation rate
-                            c_genotype.mutation_rate = random.randint(0,100)
+                            c_genotype.mutation_rate = random.randint(
+                                0,100)
                         elif choice == 1:
                             # Add a new node.
                             if c_genotype.conns != {}:
-                                conn = random.choice(list(c_genotype.conns.keys()))
+                                conn = random.choice(
+                                    list(c_genotype.conns.keys()))
                                 c_genotype.conns[conn].enabled = False
                                 node_id = str(uuid4())
-                                conn1 = ConnGene(c_genotype.conns[conn].in_node, node_id, 1, True)
-                                conn2 = ConnGene(node_id, c_genotype.conns[conn].out_node, c_genotype.conns[conn].weight, c_genotype.conns[conn].enabled)
-                                c_genotype.conns[self.global_innov + 1] = conn1
-                                c_genotype.conns[self.global_innov + 2] = conn2
-                                c_genotype.nodes.append(NodeGene(node_id, "hidden"))
-                                self.global_innov += 2
+                                conn1 = ConnGene(
+                                    c_genotype.conns[conn].in_node,
+                                    node_id, 1, True)
+                                conn2 = ConnGene(
+                                    node_id,
+                                    c_genotype.conns[conn].out_node,
+                                    c_genotype.conns[conn].weight,
+                                    c_genotype.conns[conn].enabled)
+                                innovation_lock.acquire()
+                                try:
+                                    innovation = max(innovation_dict.keys())
+                                except ValueError:
+                                    innovation = 0
+                                c_genotype.conns[innovation + 1] = conn1
+                                innovation_dict[innovation + 1] = {'in': conn1.in_node, 'out': conn1.out_node}
+                                c_genotype.conns[innovation + 2] = conn2
+                                innovation_dict[innovation + 2] = {'in': conn2.in_node, 'out': conn2.out_node}
+                                innovation_lock.release()
+                                c_genotype.nodes.append(
+                                    NodeGene(node_id, "hidden"))
                         elif choice == 2:
                             # Add a new connection
-                            c_shape = NeatGraph.convert_genes_to_usable_format(c_genotype)
-                            #out_node = random.choice(list(c_shape.keys()))
+                            c_shape = NeatGraph.convert_genes_to_usable_format(
+                                c_genotype)
                             possible_keys = set(c_shape.keys())
-                            out_node = list(possible_keys)[random.randint(0,len(possible_keys)-1)]
+                            out_node = list(possible_keys)[
+                                random.randint(0,len(possible_keys)-1)]
                             while c_shape[out_node]['type'] == 'enter':
-                                #out_node = random.choice(list(c_shape.keys()))
                                 possible_keys -= {out_node}
-                                out_node = list(possible_keys)[random.randint(0,len(possible_keys)-1)]
+                                out_node = list(possible_keys)[
+                                    random.randint(
+                                        0,len(possible_keys)-1)]
                             def find_possible_nodes(shape, node):
-                                def find_after_nodes(shape, node, possible_set=None):
+                                def find_after_nodes(
+                                        shape, node,
+                                        possible_set=None):
                                     if possible_set is None:
                                         possible_set = set()
                                     possible_set |= {node}
                                     for inode_name, inode_val in shape.items():
-                                        in_nodes = {i[0] for i in inode_val['nodes']}
+                                        in_nodes = {
+                                            i[0] for i in inode_val['nodes']}
                                         if node in in_nodes:
-                                            possible_set |= find_after_nodes(shape, inode_name, possible_set)
+                                            possible_set |= find_after_nodes(
+                                                shape, inode_name, possible_set)
                                     return possible_set
                                 impossible_set = find_after_nodes(shape, node)
                                 nodes_set = {gene.id for gene in c_genotype.nodes}
@@ -299,27 +402,48 @@ class BreedController:
                             in_node = random.choice(list(possible_in_nodes))
                             w_sign = random.randint(1,2)
                             w_amount = random.random()*2
-                            conn = ConnGene(in_node, out_node, w_amount if w_sign == 1 else -w_amount, True)
-                            c_genotype.conns[self.global_innov + 1] = conn
-                            self.global_innov += 1
+                            innovation_lock.acquire()
+                            innovation = None
+                            for innov, gene in innovation_dict.items():
+                                if gene['in'] == in_node and gene['out'] == out_node:
+                                    innovation = innov
+                                    break
+                            if not innovation:
+                                try:
+                                    innovation = max(innovation_dict.keys()) + 1
+                                except ValueError:
+                                    innovation = 0
+                                innovation_dict[innovation] = {'in': in_node, 'out': out_node}
+                            innovation_lock.release()
+                            conn = ConnGene(
+                                in_node,
+                                out_node,
+                                w_amount if w_sign == 1 else -w_amount, True)
+
+                            c_genotype.conns[innovation] = conn
                         elif choice == 3:
                             # Toggle connection enabled
                             if c_genotype.conns != {}:
-                                conn = random.choice(list(c_genotype.conns.keys()))
-                                c_genotype.conns[conn].enabled = not c_genotype.conns[conn].enabled
+                                conn = random.choice(
+                                    list(c_genotype.conns.keys()))
+                                c_genotype.conns[conn].enabled = not c_genotype.conns[
+                                    conn].enabled
                         elif choice == 4:
                             # Change connection weight
                             if c_genotype.conns != {}:
-                                conn = random.choice(list(c_genotype.conns.keys()))
+                                conn = random.choice(
+                                    list(c_genotype.conns.keys()))
                                 sign = random.randint(1,2)
                                 amount = random.random()*2
                                 c_genotype.conns[conn].weight = amount if sign == 1 else -amount
                     new_graphs[child_counter] = c_genotype
                     child_counter += 1
-                    if child_counter == self.species_count: # If we've hit the amount of children needed.
-                        #return new_graphs # return the new graphs for this genera.
-                        logging.debug(f'##Ending proccess {os.getpid()} for genera: {genera}')
-                        return [genera, new_graphs, self.global_innov]
+                    # If we've hit the amount of children needed.
+                    if child_counter == self.species_count:
+                        logging.debug(f'##Ending proccess {os.getpid()}\
+ for genera: {genera}')
+                        # return the new graphs for this genera.
+                        return [genera, new_graphs]
 
 
 class NeatController:
@@ -329,28 +453,40 @@ class NeatController:
         'species_count',
         'graphs',
         'scores',
-        'global_innov',
         'current',
         'required_nodes',
         'bstart_callbacks',
         'bend_callbacks',
-        'bstatus_callbacks']
-    def __init__(self, genera: int, species: int, required_nodes: Dict[str, str]):
+        'bstatus_callbacks',
+        'innovation_dict',
+        'innovation_lock']
+    def __init__(
+            self,
+            genera: int,
+            species: int,
+            required_nodes: Dict[str, str]):
         self.genera_count = genera
         self.species_count = species
         self.graphs = {}
         self.scores = {}
-        self.global_innov = 0
         self.current = (0, 0)
         self.required_nodes = required_nodes
         self.bstart_callbacks = []
         self.bend_callbacks = []
+
+        manager = multiprocessing.Manager()
+        self.innovation_dict = manager.dict()
+        self.innovation_lock = manager.Lock()
         for i in range(0, self.genera_count):
             self.graphs[i] = {}
             self.scores[i] = {}
             for j in range(0, self.species_count):
-                self.graphs[i][j] = NeatGraph(Genotype([
-                    NodeGene(i, j) for i, j in self.required_nodes.items()],{},random.randint(0,100)))
+                self.graphs[i][j] = NeatGraph(
+                    Genotype(
+                        [NodeGene(i, j) for i,
+                         j in self.required_nodes.items()],
+                    {},
+                    random.randint(0,100)))
                 self.scores[i][j] = 0
 
     @property
@@ -362,9 +498,12 @@ class NeatController:
         return self.graphs[self.current[0]][self.current[1]].run(inputs)
 
     def game_over(self, score):
-        """assign score to the current graph and move onto the next one. If no graphs left, call the breed method."""
+        """assign score to the current graph and move onto the next one.
+        If no graphs left, call the breed method."""
         self.scores[self.current[0]][self.current[1]] = score
-        if self.current == (self.genera_count - 1, self.species_count - 1):
+        if self.current == (
+                self.genera_count - 1,
+                self.species_count - 1):
             self.current = (0, 0)
             self.breed()
         elif self.current[1] == self.species_count - 1:
@@ -384,21 +523,26 @@ class NeatController:
         for cb in self.bstart_callbacks: # Run all our start callbacks,
             cb(self)
         new_graphs = {} # Create a new dict for our new graphs.
-        pool = multiprocessing.Pool(THREAD_COUNT) # Create a new pool for our processes.
-        ins = [i for i in range(0, self.genera_count)]
+        # Create a new pool for our processes.
+        pool = multiprocessing.Pool(THREAD_COUNT)
+        ins = [[i, self.innovation_dict, self.innovation_lock] for i in range(0, self.genera_count)]
         bController = BreedController(
-            self.global_innov,
             self.required_nodes,
             self.scores,
-            {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in self.graphs.items()},
+            {i:
+             {ji: jk.genotype for ji, jk in j.items()
+             } for i, j in self.graphs.items()},
             self.species_count,
             self.genera_count
         )
-        results = pool.map(bController.run, ins) # Get our results from our pool.
+        # Get our results from our pool.
+        results = pool.map(bController.run, ins)
         for result in results:
             print(f'RESULT: {type(result)}')
-            new_graphs[result[0]] = {i: NeatGraph(j) for i, j in result[1].items()} # Add our results to new_graphs converting the genotypes into NeatGraphs.
-        self.global_innov = max(i[2] for i in results)
+            # Add our results to new_graphs
+            # converting the genotypes into NeatGraphs.
+            new_graphs[result[0]] = {
+                i: NeatGraph(j) for i, j in result[1].items()}
         self.graphs = new_graphs # replace the graphs with the new ones.
         for cb in self.bend_callbacks: # Run our end callbacks.
             cb(self)
