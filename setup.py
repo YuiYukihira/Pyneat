@@ -7,10 +7,10 @@ with open('README.rst', 'r') as f:
     readme = f.read()
 
 setup(name="pyneat",
-      version="1.0.0b3",
+      version="1.0.0rc1",
       description="An implementation of Kenneth O. Stanley's NeuroEvolution of Augmenting Topologies",
       long_description=readme,
-      url="https://gitlab.com/NeatJumper/Neat",
+      url="https://github.com/YuiYukihira/Pyneat",
       author="Yui Yukihira",
       author_email="yui.yukihira42@gmail.com",
       license="MIT",
@@ -20,7 +20,7 @@ setup(name="pyneat",
       setup_requires=['pytest-runner'],
       tests_require=['pytest'],
       zip_safe=False,
-      download_url="https://gitlab.com/NeatJumper/Neat/repository/1.0.0b3/archive.tar.gz",
+      download_url="https://github.com/YuiYukihira/Pyneat/archive/1.0.0rc1.tar.gz",
       classifiers=[
           'Development Status :: 3 - Alpha',
           'License :: OSI Approved :: MIT License',
