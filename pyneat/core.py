@@ -4,6 +4,7 @@ from uuid import uuid4
 from typing import Dict, List, Union, Tuple
 from dataclasses import dataclass
 import multiprocessing
+import dill
 
 import tensorflow as tf
 import os
@@ -136,6 +137,14 @@ class NodeGene:
 
     __slots__ = ["id", "type"]
 
+    def __post_init__(self):
+        if not isinstance(self.id, str):
+            raise TypeError
+        if not isinstance(self.type, str):
+            raise TypeError
+        if not self.type in ['enter', 'hidden', 'exit']:
+            raise ValueError
+
 @dataclass
 class ConnGene:
     """
@@ -152,6 +161,16 @@ class ConnGene:
     enabled: bool
 
     __slots__ = ["in_node", "out_node", "weight", "enabled"]
+
+    def __post_init__(self):
+        if not isinstance(self.in_node, str):
+            raise TypeError
+        if not isinstance(self.out_node, str):
+            raise TypeError
+        if not isinstance(self.weight, float):
+            raise TypeError
+        if not isinstance(self.enabled, bool):
+            raise TypeError
 
 @dataclass
 class Genotype:
@@ -170,6 +189,24 @@ class Genotype:
 
     __slots__ = ['nodes', 'conns', 'mutation_rate']
 
+    def __post_init__(self):
+        if not isinstance(self.nodes, list):
+            raise TypeError
+        else:
+            for i in self.nodes:
+                if not isinstance(i, NodeGene):
+                    raise TypeError
+        if not isinstance(self.conns, Dict):
+            raise TypeError
+        else:
+            for i, j in self.conns.items():
+                if not isinstance(i, int):
+                    raise TypeError
+                if not isinstance(j, ConnGene):
+                    raise TypeError
+        if not isinstance(self.mutation_rate, int):
+            raise TypeError
+
 class NeatGraph:
     """
     A graph that has a genotype that follows the NEAT style
@@ -177,6 +214,8 @@ class NeatGraph:
     """
     def __init__(self, genes: Genotype):
 #        logging.info('NEAT Graph created!')
+        if not isinstance(genes, Genotype):
+            raise TypeError
         self.genotype = genes
         # create our phenotype from our genes.
         self.phenotype = Graph(
@@ -186,6 +225,8 @@ class NeatGraph:
     def convert_genes_to_usable_format(genotype: Genotype) -> GRAPH_SHAPE:
         """The information in the Genotype class is not in the correct format
         so we have to convert it for the graph class."""
+        if not isinstance(genotype, Genotype):
+            raise TypeError
         usable = {} # Dictionary of previously computed nodes.
         for node in genotype.nodes: # For every node in the genotype.
             #logging.debug(f'node: {node}')
@@ -194,11 +235,15 @@ class NeatGraph:
             for conn in genotype.conns.values():
                 #logging.debug(f'\tconn: {conn}')
                 # Does this connection have the node as it's output node?
-                if conn.out_node == node.id:
-                    # Add the input node into in's with the
-                    # id and weight. And a bias of 0 as we don't use it.
-                    ins.append((conn.in_node, conn.weight if conn.enabled else 0, 0))
-                    #logging.debug(f'\t\tins: {ins}')
+                try:
+                    if conn.out_node == node.id:
+                        # Add the input node into in's with the
+                        # id and weight. And a bias of 0 as we don't use it.
+                        ins.append((conn.in_node, conn.weight if conn.enabled else 0, 0))
+                        #logging.debug(f'\t\tins: {ins}')
+                except AttributeError as e:
+                    print(e)
+                    print(f"conn: {conn}\nnode: {node}")
             # Add the input nodes to the useable dict with the node id as the key.
             usable[node.id] = {'nodes': ins, 'type': node.type}
             #logging.debug(f'\tusable: {usable}')
@@ -349,7 +394,7 @@ class BreedController:
                                 node_id = str(uuid4())
                                 conn1 = ConnGene(
                                     c_genotype.conns[conn].in_node,
-                                    node_id, 1, True)
+                                    node_id, 1.0, True)
                                 conn2 = ConnGene(
                                     node_id,
                                     c_genotype.conns[conn].out_node,
@@ -445,8 +490,27 @@ class BreedController:
                         # return the new graphs for this genera.
                         return [genera, new_graphs]
 
+@dataclass
+class NeatSave(object):
+    """A save class for a NEAT controller"""
+    genera_count: int
+    species_count: int
+    graphs: Dict[int, Dict[int, Genotype]]
+    scores: Dict[int, Dict[int, int]]
+    current: Tuple[int, int]
+    required_nodes: Dict[str, str]
+    innovation_dict: dict
+    __slots__ = [
+        'genera_count',
+        'species_count',
+        'graphs',
+        'scores',
+        'current',
+        'required_nodes',
+        'innovation_dict'
+    ]
 
-class NeatController:
+class NeatController(object):
     """Controlls the NEAT process."""
     __slots__ = [
         'genera_count',
@@ -465,6 +529,20 @@ class NeatController:
             genera: int,
             species: int,
             required_nodes: Dict[str, str]):
+        if not isinstance(genera, int):
+            raise TypeError
+        if not isinstance(species, int):
+            raise TypeError
+        if not isinstance(required_nodes, dict):
+            raise TypeError
+        else:
+            for i, j in required_nodes.items():
+                if not isinstance(i, str):
+                    raise TypeError
+                if not isinstance(j, str):
+                    raise TypeError
+                elif j not in ["enter", "hidden", "exit"]:
+                    raise ValueError
         self.genera_count = genera
         self.species_count = species
         self.graphs = {}
@@ -476,7 +554,7 @@ class NeatController:
 
         manager = multiprocessing.Manager()
         self.innovation_dict = manager.dict()
-        self.innovation_lock = manager.Lock()
+        self.innovation_lock = manager.RLock()
         for i in range(0, self.genera_count):
             self.graphs[i] = {}
             self.scores[i] = {}
@@ -488,6 +566,34 @@ class NeatController:
                     {},
                     random.randint(0,100)))
                 self.scores[i][j] = 0
+
+    def save_state(self, filename: str ="NEATsave.pkl") -> None:
+        ns = NeatSave(
+            self.genera_count,
+            self.species_count,
+            {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in self.graphs.items()},
+            self.scores,
+            self.current,
+            self.required_nodes,
+            self.innovation_dict
+        )
+        with open(filename, 'wb') as output:
+            dill.dump(ns, output)
+
+
+    @classmethod
+    def load_state(cls, filename: str ="NEATsave.pkl"):
+        with open(filename, 'rb') as input_file:
+            obj = dill.load(input_file)
+        inst = cls(0, 0, obj.required_nodes)
+        inst.genera_count = obj.genera_count
+        inst.species_count = obj.species_count
+        inst.graphs = {i: {ji: NeatGraph(jk) for ji, jk in j.items()} for i, j in obj.graphs.items()}
+        inst.scores = obj.scores
+        inst.current = obj.current
+        for i, j in obj.innovation_dict.items():
+            inst.innovation_dict[i] = j
+        return inst
 
     @property
     def current_graph(self):

@@ -2,7 +2,102 @@ import pytest
 import pyneat
 import random
 from math import exp
+from os import remove
 import time
+
+def type_dec(error, message):
+    def type_dec_inner(func):
+        def func_wrapper():
+            with pytest.raises(error, message=message):
+                func()
+        return func_wrapper
+    return type_dec_inner
+
+def test_type_node():
+    @type_dec(TypeError, "Expecting TypeError")
+    def test1():
+        pyneat.NodeGene(1, 'enter')
+    @type_dec(TypeError, "Expecting TypeError")
+    def test2():
+        pyneat.NodeGene("1", 1)
+    @type_dec(ValueError, "Expecting ValueError")
+    def test3():
+        pyneat.NodeGene("1", "1")
+    test1()
+    test2()
+    test3()
+
+def test_type_conn():
+    @type_dec(TypeError, "Expecting TypeError")
+    def test1():
+        pyneat.ConnGene(1, "1", 0.1, True)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test2():
+        pyneat.ConnGene("1", 1, 0.1, True)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test3():
+        pyneat.ConnGene("1", "1", "0.1", True)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test4():
+        pyneat.ConnGene("1", "1", 0.1, "True")
+    test1()
+    test2()
+    test3()
+    test4()
+
+def test_type_genotype():
+    @type_dec(TypeError, "Expecting TypeError")
+    def test1():
+        pyneat.Genotype('w', {}, 1)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test2():
+        pyneat.Genotype([], 'w', 1)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test3():
+        pyneat.Genotype(["w"], {}, 1)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test4():
+        pyneat.Genotype([], {"1": pyneat.ConnGene("1", "2", 1.0, True)}, 1)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test5():
+        pyneat.Genotype([], {1: "w"}, 1)
+    @type_dec(TypeError, "Expecting TypeError")
+    def test6():
+        pyneat.Genotype([], {}, "1")
+    test1()
+    test2()
+    test3()
+    test4()
+    test5()
+    test6()
+
+def test_type_controller():
+    @type_dec(TypeError, "Expecting TypeError")
+    def test1():
+        pyneat.Controller("1",1,{"a": "enter"})
+    @type_dec(TypeError, "Expecting TypeError")
+    def test2():
+        pyneat.Controller(1,"1",{"a": "enter"})
+    @type_dec(TypeError, "Expecting TypeError")
+    def test3():
+        pyneat.Controller(1,1,{1: "enter"})
+    @type_dec(TypeError, "Expecting TypeError")
+    def test4():
+        pyneat.Controller(1,1,{"a": 1})
+    @type_dec(ValueError, "Expecting ValueError")
+    def test5():
+        pyneat.Controller(1,1,{"a": "a"})
+    test1()
+    test2()
+    test3()
+    test4()
+    test5()
+
+
+
+
+
+
 
 def test_graph():
     graph = pyneat.Graph({
@@ -133,33 +228,44 @@ def test_neat_controller_breeding():
             assert node_id in {'a', 'b', 'c'}
 
 def test_breed_repopulation():
-    try:
-        controller = pyneat.Controller(5,5,{'a':'enter','b':'enter','c':'exit'})
-        assert controller.genera_count==5 and controller.species_count==5
-        assert len(controller.graphs)==5
-        for genera in controller.graphs.values():
-            assert len(genera)==5
-            for i in range(0, 25):
-                controller.game_over(i)
-        assert controller.genera_count==5 and controller.species_count==5
-        assert len(controller.graphs)==5
-        for genera in controller.graphs.values():
-            assert len(genera)==5
+    controller = pyneat.Controller(5,5,{'a':'enter','b':'enter','c':'exit'})
+    assert controller.genera_count==5 and controller.species_count==5
+    assert len(controller.graphs)==5
+    for genera in controller.graphs.values():
+        assert len(genera)==5
         for i in range(0, 25):
             controller.game_over(i)
-        assert controller.genera_count==5 and controller.species_count==5
-        assert len(controller.graphs)==5
-        for genera in controller.graphs.values():
-            assert len(genera)==5
-    except AssertionError as e:
-        print(e)
+    assert controller.genera_count==5 and controller.species_count==5
+    assert len(controller.graphs)==5
+    for genera in controller.graphs.values():
+        assert len(genera)==5
+    for i in range(0, 25):
+        controller.game_over(i)
+    assert controller.genera_count==5 and controller.species_count==5
+    assert len(controller.graphs)==5
+    for genera in controller.graphs.values():
+        assert len(genera)==5
 
-def test_multithreaded_controller():
-    times = []
-    for i in range(10):
-        start = time.perf_counter()
-        controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c':exit})
-        end = time.perf_counter()
-        print(f'time taken: {end-start}')
-        times.append(end-start)
-    assert sum(times)/len(times) < 6
+def test_save_load():
+    c1 = pyneat.Controller(50, 50, {'a': 'enter', 'b': 'enter', 'c': 'exit'})
+    c1.save_state("NEATsave.pkl")
+    c2 = pyneat.Controller.load_state("NEATsave.pkl")
+    assert c1.genera_count == c2.genera_count
+    assert c1.species_count == c1.species_count
+    assert {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in c1.graphs.items()} ==     {i: {ji: jk.genotype for ji, jk in j.items()} for i, j in c2.graphs.items()}
+    assert c1.scores == c2.scores
+    assert c1.current == c2.current
+    assert c1.required_nodes == c2.required_nodes
+    assert c1.innovation_dict.copy() == c2.innovation_dict.copy()
+    remove("NEATsave.pkl")
+
+
+#def test_multithreaded_controller():
+#    times = []
+#    for i in range(5):
+#        start = time.perf_counter()
+#        controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c': 'exit'})
+#        end = time.perf_counter()
+#        print(f'time taken: {end-start}')
+#        times.append(end-start)
+#    assert sum(times)/len(times) < 8
