@@ -260,12 +260,12 @@ def test_save_load():
     remove("NEATsave.pkl")
 
 
-#def test_multithreaded_controller():
-#    times = []
-#    for i in range(5):
-#        start = time.perf_counter()
-#        controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c': 'exit'})
-#        end = time.perf_counter()
-#        print(f'time taken: {end-start}')
-#        times.append(end-start)
-#    assert sum(times)/len(times) < 8
+def test_multithreaded_controller():
+    times = []
+    for i in range(5):
+        start = time.perf_counter()
+        controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c': 'exit'})
+        end = time.perf_counter()
+        print(f'time taken: {end-start}')
+        times.append(end-start)
+    assert sum(times)/len(times) < 8

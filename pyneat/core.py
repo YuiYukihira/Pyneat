@@ -8,6 +8,7 @@ import dill
 
 import tensorflow as tf
 import os
+import gc
 ## Define types
 
 GRAPH_SHAPE = Dict[str, Dict[str, Union[str, List[Tuple[str, float, float]]]]]
@@ -510,6 +511,26 @@ class NeatSave(object):
         'innovation_dict'
     ]
 
+    def __post_init__(self):
+        if not isinstance(self.genera_count, int):
+            raise TypeError
+        if not isinstance(self.species_count, int):
+            raise TypeError
+        if not isinstance(self.graphs, dict):
+            raise TypeError
+        else:
+            for i, j in self.graphs.items():
+                if not isinstance(i, int):
+                    raise TypeError
+                if not isinstance(j, dict):
+                    raise TypeError
+                else:
+                    for k, l in self.graphs.items():
+                        if not isinstance(k, int):
+                            raise TypeError
+                        if not isinstance(l, Genotype):
+                            raise TypeError
+
 class NeatController(object):
     """Controlls the NEAT process."""
     __slots__ = [
@@ -652,3 +673,4 @@ class NeatController(object):
         self.graphs = new_graphs # replace the graphs with the new ones.
         for cb in self.bend_callbacks: # Run our end callbacks.
             cb(self)
+        gc.collect()
