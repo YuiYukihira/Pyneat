@@ -664,8 +664,9 @@ class NeatController(object):
         )
         # Get our results from our pool.
         results = pool.map(bController.run, ins)
+        pool.close()
+        pool.join()
         for result in results:
-            print(f'RESULT: {type(result)}')
             # Add our results to new_graphs
             # converting the genotypes into NeatGraphs.
             new_graphs[result[0]] = {
