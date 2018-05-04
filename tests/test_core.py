@@ -2,8 +2,9 @@ import pytest
 import pyneat
 import random
 from math import exp
-from os import remove
+from os import remove, getpid
 import time
+import psutil
 
 def type_dec(error, message):
     def type_dec_inner(func):
@@ -260,12 +261,26 @@ def test_save_load():
     remove("NEATsave.pkl")
 
 
-def test_multithreaded_controller():
+def test_controller_time_performance():
     times = []
-    for i in range(5):
+    for i in range(3):
         start = time.perf_counter()
         controller = pyneat.Controller(50,50,{'a':'enter','b':'enter','c': 'exit'})
         end = time.perf_counter()
         print(f'time taken: {end-start}')
         times.append(end-start)
     assert sum(times)/len(times) < 8
+
+def test_controller_memory_performance():
+    start_memory = []
+    end_memory = []
+    process = psutil.Process(getpid())
+    for i in range(3):
+        start_memory.append(process.memory_info().rss)
+        controller = pyneat.Controller(5,5,{'a':'enter','b':'enter','c':'exit'})
+        for i in range(0, 25):
+            controller.game_over(i)
+        end_memory.append(process.memory_info().rss)
+    avg_start = sum(start_memory)/len(start_memory)
+    avg_end = sum(end_memory)/len(end_memory)
+    assert avg_end <= avg_start

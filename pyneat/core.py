@@ -274,7 +274,6 @@ class BreedController:
         genera = args[0]
         innovation_dict = args[1]
         innovation_lock = args[2]
-        print(f'0: {type(genera)}, 1: {type(innovation_dict)}, 2: {type(innovation_lock)}')
         logging.debug(
             f'##Starting process {os.getpid()} for genera: {genera}')
         top5 = {}
@@ -525,7 +524,7 @@ class NeatSave(object):
                 if not isinstance(j, dict):
                     raise TypeError
                 else:
-                    for k, l in self.graphs.items():
+                    for k, l in j.items():
                         if not isinstance(k, int):
                             raise TypeError
                         if not isinstance(l, Genotype):
