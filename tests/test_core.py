@@ -276,8 +276,8 @@ def test_controller_memory_performance():
     end_memory = []
     process = psutil.Process(getpid())
     for i in range(3):
-        start_memory.append(process.memory_info().rss)
         controller = pyneat.Controller(5,5,{'a':'enter','b':'enter','c':'exit'})
+        start_memory.append(process.memory_info().rss)
         for i in range(0, 25):
             controller.game_over(i)
         end_memory.append(process.memory_info().rss)
